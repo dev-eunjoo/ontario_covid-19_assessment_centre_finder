@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link href="https://fonts.googleapis.com/earlyaccess/notosanskr.css" rel="stylesheet" />
+    <title>Ontario COVID-19 assessment centre Finder</title>
+    <style></style>
+  </head>
+  <body>
+    <header>
+      <div class="helper"></div>
+      <div class="info">
+        <h1>Ontario COVID-19 assessment centre Finder</h1>
+        <h2><br />Please click <button id="geolocate">My Location</button> to get current location OR type your address below. <br />Address : <input type="text" id="address" size="100" /> <button id="geocode">Find</button></h2>
+      </div>
+    </header>
+
+    <main>
+      <div id="list">
+        <div id="filter">
+          Filter by City:
+          <button id="all">All</button>
+          <button id="ancaster">In Ancaster</button>
+          <button id="hamilton">In Hamilton</button>
+        </div>
+        <hr />
+        <!-- div for the printing out the information -->
+        <div id="details"></div>
+      </div>
+      <div id="map"></div>
+    </main>
+
+    <br />
+
+    <script src="testingCenter.js"></script>
+    <script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBtNjGu0Fk0YpFb9d9NRewryyPEHX1ZOUw&callback=initMap"></script>
+    <script>
+      var map;
+      var markers = [];
+      var distances = [];
+      var closestCentres = [];
+      var originAddress;
+      var marker_address;
+
+      /**
+       * initialize the google map
+       */
+      function initMap() {
+        var location = { lat: 43.2565962, lng: -79.8755349 };
+
+        map = new google.maps.Map(document.getElementById("map"), {
+          center: location,
+          zoom: 13
+        });
+
+        directionsService = new google.maps.DirectionsService();
+        directionsRenderer = new google.maps.DirectionsRenderer();
+
+        directionsRenderer.setMap(map);
+
+        geocoder = new google.maps.Geocoder();
+
+        infowindow = new google.maps.InfoWindow();
+
+        displayMarkers();
+      }
+
+      /**
+       * set the location for the markers and display them on the screen
+       */
+      function displayMarkers() {
+        for (i = 0; i < testingCenter.features.length; i++) {
+          if (testingCenter.features[i].properties.city == "Ancaster") {
+            new_icon = "http://maps.google.com/mapfiles/kml/paddle/purple-blank.png";
+          } else if (testingCenter.features[i].properties.city == "Hamilton") {
+            new_icon = "http://maps.google.com/mapfiles/kml/paddle/grn-blank.png";
+          } else {
+            new_icon = "http://maps.google.com/mapfiles/kml/paddle/orange-blank.png";
+          }
+
+          var longitude = parseFloat(testingCenter.features[i].properties.longitude);
+          var latitude = parseFloat(testingCenter.features[i].properties.latitude);
+
+          new_marker = new google.maps.Marker({
+            position: { lng: longitude, lat: latitude },
+            title: testingCenter.features[i].properties.location_name,
+            icon: new_icon
+          });
+
+          new_marker.setMap(map);
+
+          new_marker.NAME = testingCenter.features[i].properties.location_name;
+          new_marker.ADDRESS = testingCenter.features[i].properties.address;
+          new_marker.PHONE = testingCenter.features[i].properties.phone;
+          new_marker.DRIVE = testingCenter.features[i].properties.drive_through;
+          new_marker.WALKIN = testingCenter.features[i].properties.walk_ins;
+          new_marker.CITY = testingCenter.features[i].properties.city;
+
+          new_marker.addListener("click", marker_clicked);
+
+          markers.push(new_marker);
+        }
+      }
+
+      /**
+       * get the distance from the origin
+       * @param  {startLocation} origin location
+       */
+      function getDistance(startLocation) {
+        closestCentres = [];
+        distances = [];
+        document.getElementById("details").innerHTML = "<p>5 closest centres from your location.</p>";
+
+        if (typeof startLocation !== "undefined") {
+          for (i = 0; i < testingCenter.features.length; i++) {
+            var distance = calculateDistance(startLocation, markers[i]);
+
+            distance = distance.toFixed(2) * 1609;
+
+            distances.push(distance);
+
+            findclosestCentres(distance, i);
+          }
+        }
+      }
+
+      /**
+       * display the information of the closest centres on the screen
+       */
+      function displayClosestCentres() {
+        for (i = 0; i < closestCentres.length; i++) {
+          document.getElementById("details").innerHTML +=
+            "<strong><p> " +
+            testingCenter.features[closestCentres[i]].properties.location_name +
+            "</p></strong><p style='font-size:13px;'>" +
+            testingCenter.features[closestCentres[i]].properties.address +
+            "</p><p style='font-size:13px;'>" +
+            distances[closestCentres[i]].toFixed(2) +
+            "m</p><button class='drive' id='drive'>By Driving</button><button class='walk' id='walk'>By Walk</button><br /><br />";
+        }
+        generateClickBtn();
+      }
+
+      /**
+       * create the click event listenner for the buttons
+       */
+      function generateClickBtn() {
+        google.maps.event.addListener(infowindow, "domready", function () {
+          let marker_driveButtons = document.querySelectorAll(".marker_drive");
+
+          if (marker_driveButtons) {
+            for (let i = 0; i < testingCenter.features.length; i++) {
+              marker_driveButtons[i].addEventListener("click", () => {
+                checkMarkerDirection(marker_address, "DRIVING");
+              });
+            }
+          }
+        });
+
+        let driveButtons = document.querySelectorAll(".drive");
+
+        for (let i = 0; i < closestCentres.length; i++) {
+          driveButtons[i].addEventListener("click", function () {
+            checkDirection(closestCentres[i], "DRIVING");
+          });
+        }
+
+        let walkButtons = document.querySelectorAll(".walk");
+
+        for (let i = 0; i < closestCentres.length; i++) {
+          walkButtons[i].addEventListener("click", function () {
+            checkDirection(closestCentres[i], "WALKING");
+          });
+        }
+      }
+
+      /**
+       * execute find closest centres by comparing with the distances data
+       * @param  {distance} distance from the origin
+       * @param  {i(event)} the id number on the data
+       */
+      function findclosestCentres(distance, i) {
+        if (i >= 0 && i <= 4) {
+          closestCentres.push(i);
+        } else {
+          for (k = 0; k < 5; k++) {
+            if (distance < distances[closestCentres[k]]) {
+              closestCentres.splice(k, 0, i);
+              closestCentres = closestCentres.slice(0, 5);
+              break;
+            }
+          }
+        }
+      }
+
+      /**
+       * get the address value from the user's input and display the marker
+       */
+      function codeAddress() {
+        addr = document.getElementById("address").value;
+        originAddress = addr;
+        geocoder.geocode({ address: addr }, function (results, status) {
+          if (status == "OK") {
+            addr_marker = new google.maps.Marker({
+              map: map,
+              position: results[0].geometry.location,
+              icon: "http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png"
+            });
+
+            map = new google.maps.Map(document.getElementById("map"), {
+              center: results[0].geometry.location,
+              zoom: 14
+            });
+
+            addr_marker.setMap(map);
+
+            displayMarkers();
+
+            getDistance(addr_marker);
+
+            displayClosestCentres();
+          }
+        });
+      }
+
+      /**
+       * calculate the distance between the two markers
+       * @param  {a} marker a
+       * @param  {b} marker b
+       */
+      function calculateDistance(a, b) {
+        var radius = 3958.8; // Radius of the Earth in miles
+        var convertA = a.position.lat() * (Math.PI / 180);
+        var convertB = b.position.lat() * (Math.PI / 180);
+        var difflat = convertB - convertA;
+        var difflon = (b.position.lng() - a.position.lng()) * (Math.PI / 180);
+
+        var result = 2 * radius * Math.asin(Math.sqrt(Math.sin(difflat / 2) * Math.sin(difflat / 2) + Math.cos(convertA) * Math.cos(convertB) * Math.sin(difflon / 2) * Math.sin(difflon / 2)));
+        return result;
+      }
+
+      /**
+       * display the marker by getting the position from geocoding
+       * @param  {position} current position
+       */
+      function showPositionOnMap(position) {
+        var latlng = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+
+        user_location = new google.maps.Marker({
+          position: {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          },
+          title: "Your Location",
+          icon: "http://maps.google.com/mapfiles/kml/shapes/homegardenbusiness.png"
+        });
+
+        geocoder.geocode({ latLng: latlng }, function (results, status) {
+          if (status === google.maps.GeocoderStatus.OK) {
+            if (results[1]) {
+              originAddress = results[0].formatted_address;
+            }
+          }
+        });
+
+        map.setCenter({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          zoom: 14
+        });
+
+        user_location.setMap(map);
+
+        getDistance(user_location);
+
+        displayClosestCentres();
+      }
+
+      /**
+       * display the infowindow when the marker clicked
+       */
+      marker_clicked = function () {
+        if (this.PHONE == null || this.PHONE == "") {
+          this.PHONE = "Not provided";
+        }
+        if (this.DRIVE == null) {
+          this.DRIVE = "No";
+        }
+
+        infomation =
+          "<h3>" +
+          this.NAME +
+          "</h3><br />" +
+          "<p><strong>Address :</strong> " +
+          this.ADDRESS +
+          "</p>" +
+          "<p><strong>Phone Number :</strong> " +
+          this.PHONE +
+          "<p><strong>Drive through :</strong> " +
+          this.DRIVE +
+          " </p><br /><button class='marker_drive' id='marker_drive'>By Driving</button><br /><br />";
+
+        infowindow.setContent(this.ADDRESS);
+        infowindow.setContent(infomation);
+        infowindow.open(map, this);
+
+        marker_address = this.ADDRESS;
+      };
+
+      /**
+       * get the destination address using the data id number
+       * @param  {Destinationindex} data id number
+       * @param  {mode} mode option for direction
+       */
+      function checkDirection(Destinationindex, mode) {
+        arrive = testingCenter.features[Destinationindex].properties.address;
+
+        changdDirection(originAddress, arrive, mode);
+      }
+      /**
+       * get the destination address using the data id number in the infowindow
+       * @param  {Destination} destination address
+       * @param  {mode} mode option for direction
+       */
+      function checkMarkerDirection(Destination, mode) {
+        arrive = Destination;
+
+        changdDirection(originAddress, arrive, mode);
+      }
+
+      /**
+       * draw the new direction on the screen
+       * @param  {originAddress} origin address
+       * @param  {destination} destination address
+       * @param  {mode} mode option for direction
+       */
+      function changdDirection(originAddress, destination, mode) {
+        directionsRenderer.setMap(null);
+
+        directionsRenderer.setMap(map);
+
+        request = {
+          origin: originAddress,
+          destination: destination,
+          travelMode: mode
+        };
+
+        directionsService.route(request, function (result, status) {
+          if (status == "OK") {
+            directionsRenderer.setDirections(result);
+          }
+        });
+      }
+
+      /**
+       * show the centres located in ancaster
+       */
+      function filterAncaster() {
+        for (i = 0; i < markers.length; i++) {
+          if (markers[i].CITY == "Ancaster") {
+            markers[i].setMap(map);
+          } else {
+            markers[i].setMap(null);
+          }
+        }
+      }
+
+      /**
+       * show the centres located in hamilton
+       */
+      function filterHamilton() {
+        for (i = 0; i < markers.length; i++) {
+          if (markers[i].CITY == "Hamilton") {
+            markers[i].setMap(map);
+          } else {
+            markers[i].setMap(null);
+          }
+        }
+      }
+
+      /**
+       * show all the centres located
+       */
+      function filterAll() {
+        for (i = 0; i < markers.length; i++) {
+          markers[i].setMap(map);
+        }
+      }
+
+      document.getElementById("geolocate").onclick = function () {
+        if (typeof addr_marker !== "undefined") {
+          addr_marker.setMap(null);
+        }
+
+        navigator.geolocation.getCurrentPosition(showPositionOnMap);
+      };
+
+      document.getElementById("geocode").onclick = function () {
+        if (typeof user_location !== "undefined") {
+          user_location.setMap(null);
+        }
+        codeAddress();
+      };
+
+      document.getElementById("ancaster").onclick = filterAncaster;
+
+      document.getElementById("all").onclick = filterAll;
+
+      document.getElementById("hamilton").onclick = filterHamilton;
+    </script>
+  </body>
+</html>
