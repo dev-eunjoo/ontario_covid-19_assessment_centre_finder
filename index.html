@@ -112,7 +112,7 @@
       function getDistance(startLocation) {
         closestCentres = [];
         distances = [];
-        document.getElementById("details").innerHTML = "<p>5 closest centres from your location.</p>";
+        document.getElementById("details").innerHTML = "<h3>5 close centres from your location.</h3>";
 
         if (typeof startLocation !== "undefined") {
           for (i = 0; i < testingCenter.features.length; i++) {
@@ -139,7 +139,7 @@
             testingCenter.features[closestCentres[i]].properties.address +
             "</p><p style='font-size:13px;'>" +
             distances[closestCentres[i]].toFixed(2) +
-            "m</p><button class='drive' id='drive'>By Driving</button><button class='walk' id='walk'>By Walk</button><br /><br />";
+            "m</p><button class='drive' id='drive'>By driving</button><button class='walk' id='walk'>By walking</button><br /><br />";
         }
         generateClickBtn();
       }
@@ -154,7 +154,7 @@
           if (marker_driveButtons) {
             for (let i = 0; i < testingCenter.features.length; i++) {
               marker_driveButtons[i].addEventListener("click", () => {
-                checkMarkerDirection(marker_address, "DRIVING");
+                markerChangdDirection(originAddress, marker_address, "DRIVING");
               });
             }
           }
@@ -164,7 +164,7 @@
 
         for (let i = 0; i < closestCentres.length; i++) {
           driveButtons[i].addEventListener("click", function () {
-            checkDirection(closestCentres[i], "DRIVING");
+            changdDirection(originAddress, closestCentres[i], "DRIVING");
           });
         }
 
@@ -172,7 +172,7 @@
 
         for (let i = 0; i < closestCentres.length; i++) {
           walkButtons[i].addEventListener("click", function () {
-            checkDirection(closestCentres[i], "WALKING");
+            changdDirection(originAddress, closestCentres[i], "WALKING");
           });
         }
       }
@@ -232,7 +232,7 @@
        * @param  {b} marker b
        */
       function calculateDistance(a, b) {
-        var radius = 3958.8; // Radius of the Earth in miles
+        var radius = 3958.8;
         var convertA = a.position.lat() * (Math.PI / 180);
         var convertB = b.position.lat() * (Math.PI / 180);
         var difflat = convertB - convertA;
@@ -301,9 +301,8 @@
           this.PHONE +
           "<p><strong>Drive through :</strong> " +
           this.DRIVE +
-          " </p><br /><button class='marker_drive' id='marker_drive'>By Driving</button><br /><br />";
+          " </p><br /><button class='marker_drive' id='marker_drive'>By driving</button><br /><br />";
 
-        infowindow.setContent(this.ADDRESS);
         infowindow.setContent(infomation);
         infowindow.open(map, this);
 
@@ -311,33 +310,36 @@
       };
 
       /**
-       * get the destination address using the data id number
-       * @param  {Destinationindex} data id number
-       * @param  {mode} mode option for direction
-       */
-      function checkDirection(Destinationindex, mode) {
-        arrive = testingCenter.features[Destinationindex].properties.address;
-
-        changdDirection(originAddress, arrive, mode);
-      }
-      /**
-       * get the destination address using the data id number in the infowindow
-       * @param  {Destination} destination address
-       * @param  {mode} mode option for direction
-       */
-      function checkMarkerDirection(Destination, mode) {
-        arrive = Destination;
-
-        changdDirection(originAddress, arrive, mode);
-      }
-
-      /**
        * draw the new direction on the screen
+       * @param  {originAddress} origin address
+       * @param  {destinationId} destination id number of the data
+       * @param  {mode} mode option for direction
+       */
+      function changdDirection(originAddress, destinationId, mode) {
+        directionsRenderer.setMap(null);
+
+        directionsRenderer.setMap(map);
+
+        request = {
+          origin: originAddress,
+          destination: testingCenter.features[destinationId].properties.postal_code,
+          travelMode: mode
+        };
+
+        directionsService.route(request, function (result, status) {
+          if (status == "OK") {
+            directionsRenderer.setDirections(result);
+          }
+        });
+      }
+
+      /**
+       * draw the new direction on the screen based on the marker
        * @param  {originAddress} origin address
        * @param  {destination} destination address
        * @param  {mode} mode option for direction
        */
-      function changdDirection(originAddress, destination, mode) {
+      function markerChangdDirection(originAddress, destination, mode) {
         directionsRenderer.setMap(null);
 
         directionsRenderer.setMap(map);

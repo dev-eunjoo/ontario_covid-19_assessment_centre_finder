@@ -90,3 +90,7 @@ button {
 #drive {
   margin-right: 10px;
 }
+
+#details > h3 {
+  background-color: gainsboro;
+}
