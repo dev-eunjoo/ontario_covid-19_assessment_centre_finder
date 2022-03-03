@@ -28,7 +28,7 @@
 
 ### Why I made
 
-The app is for the people wnat to search the covid-19 testing centres quickly. Users can get the information of close centres from their locations and also can see the walking and driving direction. Hope this application help the people to find and visit the covid-19 testing centre more easily. 
+The app is for people who want to search the covid-19 testing centres based on their location. Users can get the information of close centres from their locations and also can see the walking and driving direction. Hope this application help the people to find and visit the covid-19 testing centre more easily. 
 
 <hr/>
 
